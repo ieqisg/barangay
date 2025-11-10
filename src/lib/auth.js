@@ -8,22 +8,50 @@ const STORAGE_CURRENT = 'br_current_user_v1';
 // No seeded demo accounts by default so testers can create real accounts.
 const defaultUsers = [];
 
+function isLocalStorageAvailable() {
+  try {
+    const test = '__test__';
+    localStorage.setItem(test, test);
+    localStorage.removeItem(test);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 function readUsers() {
+  if (!isLocalStorageAvailable()) {
+    console.warn('localStorage is not available');
+    return [];
+  }
   try {
     const raw = localStorage.getItem(STORAGE_USERS);
-    if (!raw) return [];
+    if (!raw) {
+      // Initialize empty users array if none exists
+      writeUsers([]);
+      return [];
+    }
     return JSON.parse(raw);
   } catch (e) {
+    console.error('Error reading users from localStorage:', e);
     return [];
   }
 }
 
 function writeUsers(users) {
-  localStorage.setItem(STORAGE_USERS, JSON.stringify(users || []));
+  if (!isLocalStorageAvailable()) {
+    console.warn('localStorage is not available');
+    return;
+  }
+  try {
+    localStorage.setItem(STORAGE_USERS, JSON.stringify(users || []));
+  } catch (e) {
+    console.error('Error writing users to localStorage:', e);
+  }
 }
 
-// If there are default users (none by default), seed them once.
-if (defaultUsers.length > 0 && !localStorage.getItem(STORAGE_USERS)) {
+// Initialize localStorage on module load
+if (isLocalStorageAvailable() && !localStorage.getItem(STORAGE_USERS)) {
   writeUsers(defaultUsers);
 }
 
@@ -52,52 +80,81 @@ export function getCurrentUser() {
 export function login(email, password) {
   // Simulate a server delay
   return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const users = readUsers();
-      const user = users.find((u) => u.email.toLowerCase() === (email || '').toLowerCase());
-      if (!user) return reject({ message: 'User not found' });
-      if (user.password !== password) return reject({ message: 'Invalid credentials' });
+    if (!isLocalStorageAvailable()) {
+      return reject({ message: 'Storage is not available' });
+    }
 
-      const safeUser = { ...user };
-      delete safeUser.password;
-      localStorage.setItem(STORAGE_CURRENT, JSON.stringify(safeUser));
-      notifyAuthChange(safeUser);
-      resolve(safeUser);
+    setTimeout(() => {
+      try {
+        const users = readUsers();
+        const user = users.find((u) => u.email.toLowerCase() === (email || '').toLowerCase());
+        if (!user) return reject({ message: 'User not found' });
+        if (user.password !== password) return reject({ message: 'Invalid credentials' });
+
+        const safeUser = { ...user };
+        delete safeUser.password;
+        localStorage.setItem(STORAGE_CURRENT, JSON.stringify(safeUser));
+        notifyAuthChange(safeUser);
+        resolve(safeUser);
+      } catch (e) {
+        console.error('Error during login:', e);
+        reject({ message: 'Login failed' });
+      }
     }, 600);
   });
 }
 
 export function logout() {
-  localStorage.removeItem(STORAGE_CURRENT);
-  notifyAuthChange(null);
+  if (!isLocalStorageAvailable()) {
+    console.warn('Storage is not available');
+    return;
+  }
+  try {
+    localStorage.removeItem(STORAGE_CURRENT);
+    notifyAuthChange(null);
+  } catch (e) {
+    console.error('Error during logout:', e);
+  }
 }
 
 export function register(form) {
   return new Promise((resolve, reject) => {
+    if (!isLocalStorageAvailable()) {
+      return reject({ message: 'Storage is not available' });
+    }
+
     setTimeout(() => {
-      const users = readUsers();
-      if (users.find((u) => u.email.toLowerCase() === (form.email || '').toLowerCase())) {
-        return reject({ message: 'Email already registered' });
+      try {
+        const users = readUsers();
+        if (users.find((u) => u.email.toLowerCase() === (form.email || '').toLowerCase())) {
+          return reject({ message: 'Email already registered' });
+        }
+
+        const id = `u_${Date.now()}`;
+        const newUser = {
+          id,
+          firstName: form.firstName || '',
+          lastName: form.lastName || '',
+          email: form.email,
+          password: form.password,
+          role: form.role || 'resident',
+          contactNumber: form.contactNumber || '',
+          address: form.address || ''
+        };
+
+        users.push(newUser);
+        writeUsers(users);
+        
+        const safeUser = { ...newUser };
+        delete safeUser.password;
+        // Auto-login after register
+        localStorage.setItem(STORAGE_CURRENT, JSON.stringify(safeUser));
+        notifyAuthChange(safeUser);
+        resolve(safeUser);
+      } catch (e) {
+        console.error('Error during registration:', e);
+        reject({ message: 'Registration failed' });
       }
-
-      const id = `u_${Date.now()}`;
-      const newUser = {
-        id,
-        firstName: form.firstName || '',
-        lastName: form.lastName || '',
-        email: form.email,
-        password: form.password,
-        role: form.role || 'resident'
-      };
-
-      users.push(newUser);
-      writeUsers(users);
-      const safeUser = { ...newUser };
-      delete safeUser.password;
-      // Auto-login after register
-      localStorage.setItem(STORAGE_CURRENT, JSON.stringify(safeUser));
-      notifyAuthChange(safeUser);
-      resolve(safeUser);
     }, 800);
   });
 }
