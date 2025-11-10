@@ -27,7 +27,7 @@ function Register() {
     email: "",
     contactNumber: "",
     address: "",
-    role: "",
+    role: "resident", // Set default role
     password: "",
     confirmPassword: "",
   });
@@ -50,9 +50,15 @@ function Register() {
     e.preventDefault();
     let validationErrors = {};
 
-    // Required field check
-    Object.keys(formData).forEach((key) => {
-      if (!formData[key]) {
+    // Set default role if none selected
+    const submissionData = {
+      ...formData,
+      role: formData.role || 'resident'
+    };
+
+    // Required field check (excluding confirmPassword as it's not sent to the server)
+    ['firstName', 'lastName', 'email', 'contactNumber', 'address', 'password'].forEach((key) => {
+      if (!submissionData[key]) {
         validationErrors[key] = "This field is required";
       }
     });
@@ -63,50 +69,36 @@ function Register() {
     }
 
     // Password match
-    if (
-      formData.password &&
-      formData.confirmPassword &&
-      formData.password !== formData.confirmPassword
-    ) {
+    if (formData.password !== formData.confirmPassword) {
       validationErrors.confirmPassword = "Passwords do not match";
+    }
+
+    // Password length check
+    if (formData.password && formData.password.length < 6) {
+      validationErrors.password = 'Password must be at least 6 characters';
     }
 
     setErrors(validationErrors);
 
+    // Only proceed if there are no validation errors
     if (Object.keys(validationErrors).length === 0) {
-      // Use the browser's native validation first. If the form is invalid,
-      // show the browser messages and stop.
-      const formEl = e.target;
-      if (formEl && typeof formEl.checkValidity === 'function') {
-        if (!formEl.checkValidity()) {
-          formEl.reportValidity();
-          return;
-        }
-      }
-
-      // Additional checks: password length and match
-      if (formData.password.length < 6) {
-        setErrors({ ...validationErrors, password: 'Password must be at least 6 characters' });
-        return;
-      }
-
-      if (formData.password !== formData.confirmPassword) {
-        setErrors({ ...validationErrors, confirmPassword: 'Passwords do not match' });
-        return;
-      }
-
+      console.log('Submitting registration with data:', submissionData);
+      
       // call mock register which will auto-login the user on success
-      register(formData)
+      register(submissionData)
         .then(() => {
-          alert('Account created and logged in');
+          console.log('Registration successful');
           // redirect by role
-          const role = formData.role || 'resident';
-          if (role === 'staff') navigate('/staff');
+          if (submissionData.role === 'staff') navigate('/staff');
           else navigate('/residentDashboard');
         })
         .catch((err) => {
-          alert(err.message || 'Unable to register');
+          console.error('Registration failed:', err);
+          alert(err.message || 'Unable to register. Please try again.');
+          setErrors({ ...validationErrors, submit: err.message });
         });
+    } else {
+      console.log('Form has validation errors:', validationErrors);
     }
   };
 
@@ -225,7 +217,7 @@ function Register() {
               <div className="space-y-2">
                 <Label htmlFor="role">Account Type</Label>
                 <Select
-                  value={formData.role}
+                  value={formData.role || 'resident'}
                   onValueChange={(val) =>
                     setFormData({ ...formData, role: val })
                   }
@@ -242,15 +234,6 @@ function Register() {
                     <SelectItem value="staff">Barangay Staff</SelectItem>
                   </SelectContent>
                 </Select>
-                {/* Offscreen required input to let native HTML validation catch empty role
-                    (custom Select components don't participate in browser validation) */}
-                <input
-                  aria-hidden="true"
-                  value={formData.role}
-                  onChange={() => {}}
-                  required
-                  style={{ position: 'absolute', left: -9999, width: 1, height: 1, overflow: 'hidden' }}
-                />
                 {errors.role && (
                   <p className="text-red-500 text-sm">{errors.role}</p>
                 )}
