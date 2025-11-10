@@ -107,7 +107,7 @@ export function requireRole(role) {
   return user && user.role === role;
 }
 
-export default {
+const auth = {
   getCurrentUser,
   login,
   logout,
@@ -115,3 +115,5 @@ export default {
   onAuthChange,
   requireRole,
 };
+
+export default auth;

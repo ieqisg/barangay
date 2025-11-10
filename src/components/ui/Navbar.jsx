@@ -22,7 +22,7 @@ export default function Navbar() {
       unsubAuth();
       unsubNot();
     };
-  }, []);
+  }, [user?.id]);
 
   const handleLogout = () => {
     doLogout();

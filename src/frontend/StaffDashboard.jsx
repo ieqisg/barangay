@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Navbar from '../components/ui/Navbar';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import Button from '../components/ui/button';
-import { getAllRequests, updateRequestStatus, assignHandler, getNotifications, onRequests } from '../lib/requests';
+import { getAllRequests, updateRequestStatus, assignHandler, onRequests } from '../lib/requests';
 import { getCurrentUser } from '../lib/auth';
 import RequestCard from '../components/RequestCard';
 

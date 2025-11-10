@@ -186,7 +186,7 @@ export function markNotificationRead(id) {
   if (idx !== -1) { n[idx].read = true; writeNotifs(n); notifyNotifsChange(); }
 }
 
-export default {
+const requests = {
   createRequest,
   getRequestsByUserId,
   getAllRequests,
@@ -196,6 +196,9 @@ export default {
   addLog,
   getNotifications,
   markNotificationRead,
+};
+
+export default requests;
   onNotifications,
   onRequests,
 };
