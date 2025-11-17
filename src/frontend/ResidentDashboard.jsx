@@ -18,10 +18,16 @@ export default function ResidentDashboard() {
 
   useEffect(() => {
     if (user?.id) {
-      setRequests(getRequestsByUserId(user.id));
+      getRequestsByUserId(user.id)
+        .then((r) => setRequests(Array.isArray(r) ? r : []))
+        .catch(() => setRequests([]));
     }
     const unsub = onRequests(() => {
-      if (user?.id) setRequests(getRequestsByUserId(user.id));
+      if (user?.id) {
+        getRequestsByUserId(user.id)
+          .then((r) => setRequests(Array.isArray(r) ? r : []))
+          .catch(() => setRequests([]));
+      }
     });
     return () => unsub();
   }, [user?.id]);

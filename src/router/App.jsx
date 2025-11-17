@@ -4,15 +4,28 @@ import SignIn from '../frontend/SignIn'
 import SubmitRequest from '../frontend/SubmitRequest';
 import ResidentDashboard from '../frontend/ResidentDashboard';
 import StaffDashboard from '../frontend/StaffDashboard';
+import RequireAuth from './RequireAuth';
 
 function App() {
   return (
     <Routes>
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<SignIn />} />
-  <Route path="/submit-request" element={<SubmitRequest />} />
-      <Route path="/residentDashboard" element={<ResidentDashboard />} />
-  <Route path="/staff" element={<StaffDashboard />} />
+      <Route path="/submit-request" element={
+        <RequireAuth>
+          <SubmitRequest />
+        </RequireAuth>
+      } />
+      <Route path="/residentDashboard" element={
+        <RequireAuth>
+          <ResidentDashboard />
+        </RequireAuth>
+      } />
+      <Route path="/staff" element={
+        <RequireAuth>
+          <StaffDashboard />
+        </RequireAuth>
+      } />
       <Route path="/" element={<Navigate to="/login" replace />} />
     </Routes>
   );

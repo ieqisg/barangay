@@ -2,11 +2,10 @@
 // - Provides login, logout, register, and current user persisted in localStorage
 // - Emits auth change events for UI to subscribe
 
-const STORAGE_USERS = 'br_users_v1';
-const STORAGE_CURRENT = 'br_current_user_v1';
+import { API_BASE, apiFetch } from './api';
 
-// No seeded demo accounts by default so testers can create real accounts.
-const defaultUsers = [];
+// Only keep the current-user storage (token + user). Mock user lists removed.
+const STORAGE_CURRENT = 'br_current_user_v1';
 
 function isLocalStorageAvailable() {
   try {
@@ -19,41 +18,7 @@ function isLocalStorageAvailable() {
   }
 }
 
-function readUsers() {
-  if (!isLocalStorageAvailable()) {
-    console.warn('localStorage is not available');
-    return [];
-  }
-  try {
-    const raw = localStorage.getItem(STORAGE_USERS);
-    if (!raw) {
-      // Initialize empty users array if none exists
-      writeUsers([]);
-      return [];
-    }
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error('Error reading users from localStorage:', e);
-    return [];
-  }
-}
-
-function writeUsers(users) {
-  if (!isLocalStorageAvailable()) {
-    console.warn('localStorage is not available');
-    return;
-  }
-  try {
-    localStorage.setItem(STORAGE_USERS, JSON.stringify(users || []));
-  } catch (e) {
-    console.error('Error writing users to localStorage:', e);
-  }
-}
-
-// Initialize localStorage on module load
-if (isLocalStorageAvailable() && !localStorage.getItem(STORAGE_USERS)) {
-  writeUsers(defaultUsers);
-}
+// Removed local mock user store - backend API is required for auth operations.
 
 let authSubscribers = [];
 
@@ -69,6 +34,7 @@ export function onAuthChange(cb) {
 }
 
 export function getCurrentUser() {
+  // If API configured, we rely on localStorage as a client-side cache
   try {
     const raw = localStorage.getItem(STORAGE_CURRENT);
     return raw ? JSON.parse(raw) : null;
@@ -78,35 +44,40 @@ export function getCurrentUser() {
 }
 
 export function login(email, password) {
-  // Simulate a server delay
-  return new Promise((resolve, reject) => {
-    if (!isLocalStorageAvailable()) {
-      return reject({ message: 'Storage is not available' });
+  // Server-backed login. Attempt call and map some errors to a user-friendly message.
+  return apiFetch('/auth/login', {
+    method: 'POST',
+    body: { email, password },
+  }).then((response) => {
+    // API returns { token, user }
+    const userWithToken = response.user ? { ...response.user, token: response.token } : response;
+    try { localStorage.setItem(STORAGE_CURRENT, JSON.stringify(userWithToken)); } catch (e) {}
+    notifyAuthChange(userWithToken);
+    return userWithToken;
+  }).catch((err) => {
+    // If the API helper indicates missing API base, surface a user-friendly message
+    const msg = (err && err.message) ? err.message : '';
+    const bodyMsg = err && err.body && err.body.message ? err.body.message : '';
+
+    if (msg.includes('API base') || bodyMsg === 'No account found' || bodyMsg === 'User not found') {
+      const e = new Error('User not found');
+      e.status = err && err.status;
+      throw e;
     }
 
-    setTimeout(() => {
-      try {
-        const users = readUsers();
-        const user = users.find((u) => u.email.toLowerCase() === (email || '').toLowerCase());
-        if (!user) return reject({ message: 'User not found' });
-        if (user.password !== password) return reject({ message: 'Invalid credentials' });
-
-        const safeUser = { ...user };
-        delete safeUser.password;
-        localStorage.setItem(STORAGE_CURRENT, JSON.stringify(safeUser));
-        notifyAuthChange(safeUser);
-        resolve(safeUser);
-      } catch (e) {
-        console.error('Error during login:', e);
-        reject({ message: 'Login failed' });
-      }
-    }, 600);
+    // Otherwise rethrow original error so callers can display the backend message
+    throw err;
   });
 }
 
 export function logout() {
+  if (API_BASE) {
+    // best-effort call to server logout, ignore failures
+    apiFetch('/auth/logout', { method: 'POST' }).catch(() => {});
+  }
   if (!isLocalStorageAvailable()) {
     console.warn('Storage is not available');
+    notifyAuthChange(null);
     return;
   }
   try {
@@ -118,44 +89,13 @@ export function logout() {
 }
 
 export function register(form) {
-  return new Promise((resolve, reject) => {
-    if (!isLocalStorageAvailable()) {
-      return reject({ message: 'Storage is not available' });
-    }
-
-    setTimeout(() => {
-      try {
-        const users = readUsers();
-        if (users.find((u) => u.email.toLowerCase() === (form.email || '').toLowerCase())) {
-          return reject({ message: 'Email already registered' });
-        }
-
-        const id = `u_${Date.now()}`;
-        const newUser = {
-          id,
-          firstName: form.firstName || '',
-          lastName: form.lastName || '',
-          email: form.email,
-          password: form.password,
-          role: form.role || 'resident',
-          contactNumber: form.contactNumber || '',
-          address: form.address || ''
-        };
-
-        users.push(newUser);
-        writeUsers(users);
-        
-        const safeUser = { ...newUser };
-        delete safeUser.password;
-        // Auto-login after register
-        localStorage.setItem(STORAGE_CURRENT, JSON.stringify(safeUser));
-        notifyAuthChange(safeUser);
-        resolve(safeUser);
-      } catch (e) {
-        console.error('Error during registration:', e);
-        reject({ message: 'Registration failed' });
-      }
-    }, 800);
+  if (!API_BASE) return Promise.reject(new Error('API not configured'));
+  return apiFetch('/auth/register', { method: 'POST', body: form }).then((response) => {
+    // API returns { token, user }
+    const userWithToken = response.user ? { ...response.user, token: response.token } : response;
+    try { localStorage.setItem(STORAGE_CURRENT, JSON.stringify(userWithToken)); } catch (e) {}
+    notifyAuthChange(userWithToken);
+    return userWithToken;
   });
 }
 

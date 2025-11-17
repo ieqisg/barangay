@@ -11,13 +11,16 @@ export default function Navbar() {
   const location = useLocation();
 
   const [user, setUser] = useState(getCurrentUser());
-  const [notifications, setNotifications] = useState(() => getNotifications(user?.id));
+  // start with an empty array — `getNotifications` returns a Promise
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
     const unsubAuth = onAuthChange((u) => setUser(u));
     const unsubNot = onNotifications((n) => setNotifications(n));
-    // initial load
-    setNotifications(getNotifications(user?.id));
+    // initial load (getNotifications returns a Promise)
+    getNotifications(user?.id)
+      .then((n) => setNotifications(Array.isArray(n) ? n : []))
+      .catch(() => setNotifications([]));
     return () => {
       unsubAuth();
       unsubNot();
@@ -36,8 +39,15 @@ export default function Navbar() {
   const isActive = (path) => location.pathname === path;
 
   const getNavItems = () => {
-    const baseItems = [{ path: '/', label: 'Dashboard', icon: Home }];
-    if (!user) return baseItems;
+    // Dashboard should route to the correct page depending on the logged-in user's role
+    const dashboardPath = user
+      ? (user.role === 'staff' || user.role === 'admin' ? '/staff' : '/residentDashboard')
+      : '/';
+
+    const baseItems = [{ path: dashboardPath, label: 'Dashboard', icon: Home }];
+
+    // If no user, return the simple base item (navbar will be hidden anyway)
+    if (!user) return [{ path: '/', label: 'Dashboard', icon: Home }];
 
     if (user.role === 'resident') {
       return [...baseItems, { path: '/submit-request', label: 'Submit Request', icon: FileText }];

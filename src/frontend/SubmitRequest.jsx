@@ -16,7 +16,7 @@ import {
   CardTitle,
   CardDescription,
 } from "../components/ui/card";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle } from "lucide-react";
 import Navbar from "../components/ui/Navbar";
 import TextArea from "../components/ui/textarea";
 import { getCurrentUser } from '../lib/auth';
@@ -58,14 +58,17 @@ export default function SubmitRequest() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
+  const [submittedRequest, setSubmittedRequest] = useState(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) return alert('Please sign in first');
     try {
-      await createRequest({ title, description, type, priority }, user);
-      alert('Request submitted');
-      navigate('/residentDashboard');
+      const req = await createRequest({ title, description, type, priority }, user);
+      // show success design instead of a plain alert
+      setSubmittedRequest(req);
+      // scroll to top so user sees confirmation
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       alert(err.message || 'Failed to submit');
     }
@@ -76,6 +79,38 @@ export default function SubmitRequest() {
       <Navbar />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {submittedRequest && (
+          <div className="mb-6">
+            <Card className="border-green-200 bg-green-50">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                  <div>
+                    <h3 className="text-lg font-semibold">Request Submitted</h3>
+                    <p className="text-sm text-muted-foreground">Your request has been received and is now in the queue.</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Title</p>
+                    <p className="font-medium">{submittedRequest.title}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Reference ID</p>
+                    <p className="font-mono text-sm text-gray-800">{submittedRequest.id}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex gap-3">
+                  <Button onClick={() => navigate('/residentDashboard')}>Go to Dashboard</Button>
+                  <Button variant="outline" onClick={() => { navigator.clipboard?.writeText(submittedRequest.id); alert('Reference copied'); }}>Copy Reference</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
         {/* Header */}
         <div className="mb-8">
           <Link to="/residentDashboard">

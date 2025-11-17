@@ -11,7 +11,7 @@ import React, { useState } from 'react'
 //   </SelectContent>
 // </Select>
 
-export function Select({ children, className = '', ...props }) {
+export function Select({ children, className = '', value: propValue, onValueChange, ...props }) {
   const parts = React.Children.toArray(children)
   const trigger = parts.find((c) => c && c.type && c.type.displayName === 'SelectTrigger')
   const content = parts.find((c) => c && c.type && c.type.displayName === 'SelectContent')
@@ -21,13 +21,25 @@ export function Select({ children, className = '', ...props }) {
     : undefined
 
   const items = content ? React.Children.toArray(content.props.children) : []
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState(propValue ?? '')
+
+  // keep internal state in sync when controlled from parent
+  React.useEffect(() => {
+    if (propValue !== undefined && propValue !== value) setValue(propValue ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propValue])
+
+  const handleChange = (e) => {
+    const v = e.target.value
+    setValue(v)
+    if (typeof onValueChange === 'function') onValueChange(v)
+  }
 
   return (
     <div className={`relative ${className}`} {...props}>
       <select
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={handleChange}
         className="block w-full rounded-md border-gray-300 px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500"
       >
         {placeholder && (

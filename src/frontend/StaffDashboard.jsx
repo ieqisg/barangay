@@ -12,8 +12,11 @@ export default function StaffDashboard() {
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
-    setRequests(getAllRequests());
-    const unsub = onRequests((r) => setRequests(r));
+    // getAllRequests returns a Promise — resolve it and set an array
+    getAllRequests()
+      .then((r) => setRequests(Array.isArray(r) ? r : []))
+      .catch(() => setRequests([]));
+    const unsub = onRequests((r) => setRequests(Array.isArray(r) ? r : []));
     return () => unsub();
   }, []);
 

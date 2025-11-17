@@ -25,7 +25,9 @@ function SignIn() {
     setError(null);
     try {
       const user = await login(email, password);
-      if (user.role === 'staff') navigate('/staff');
+      console.log('Signed in user:', user);
+      const role = (user && user.role) || null;
+      if (role === 'staff') navigate('/staff');
       else navigate('/residentDashboard');
     } catch (err) {
       setError(err.message || 'Sign in failed');

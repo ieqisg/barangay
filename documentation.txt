@@ -1,0 +1,191 @@
+Project: Barangay Request System
+Path: c:\Users\marct\Desktop\barangay
+
+Overview
+--------
+This is a small React + Express + MongoDB application for managing barangay service requests. The repository contains:
+- frontend (React CRA) files under `src/` and `public/`.
+- backend Express API under `backend/` (routes, models, server.js).
+- Build output in `build/` for production deploy.
+
+Purpose
+-------
+Residents can sign up, submit requests; staff/admin can manage requests, update statuses, and view notifications.
+
+Quick local setup (development)
+-------------------------------
+Prerequisites:
+- Node.js (>=16 recommended)
+- npm
+- MongoDB (local) or MongoDB Atlas
+- Optional: Docker (for running Mongo locally)
+
+1. Start a local MongoDB (recommended with Docker):
+   docker run -d --name barangay-mongo -p 27017:27017 -v barangay-mongo-data:/data/db mongo:6
+
+2. Backend env file (backend/.env):
+   MONGODB_URI=mongodb://localhost:27017/Users
+   JWT_SECRET=your_jwt_secret_here
+   PORT=5000
+   NODE_ENV=development
+   REACT_APP_API_URL=http://localhost:5000
+
+   If you use MongoDB Atlas, replace `MONGODB_URI` with the Atlas connection string.
+
+3. Start backend:
+   cd backend
+   npm install
+   npm start
+
+4. Start frontend:
+   cd .. (project root)
+   npm install
+   npm start
+
+5. Open http://localhost:3000 in your browser.
+
+Environment variables (important)
+--------------------------------
+- For backend (runtime):
+  - `MONGODB_URI` - MongoDB connection string (eg. mongodb://localhost:27017/Users or Atlas URI)
+  - `JWT_SECRET` - secret for signing JSON Web Tokens
+  - `PORT` - port for Express (default 5000)
+  - `CORS_ORIGIN` - frontend origin (e.g., http://localhost:3000). If omitted, default is http://localhost:3000 in server.js.
+
+- For frontend (build-time):
+  - `REACT_APP_API_URL` - base URL of the API (e.g., http://localhost:5000). For Netlify or other hosts, set to your deployed API base URL.
+
+Backend structure
+-----------------
+- `backend/server.js` - main Express setup and DB connection
+- `backend/models/` - Mongoose models: User.js, Request.js, Notification.js
+- `backend/routes/` - Express routers: auth.js, requests.js, notifications.js
+
+Authentication
+--------------
+- Uses JWT signed with `JWT_SECRET`.
+- Protected endpoints require `Authorization: Bearer <token>` header.
+
+API Reference
+-------------
+Base path: / (server runs at e.g. http://localhost:5000)
+
+Auth Routes (/auth)
+- POST /auth/register
+  - Description: Register a new user
+  - Body (JSON): { email, password, firstName, lastName, role? }
+  - Response: 201 { token, user }
+  - Notes: role defaults to 'resident' if omitted.
+
+- POST /auth/login
+  - Description: Authenticate a user
+  - Body (JSON): { email, password }
+  - Response: 200 { token, user }
+
+- POST /auth/logout
+  - Description: No-op server-side; client removes token
+  - Response: 200 { message }
+
+- GET /auth/me
+  - Description: Get current authenticated user info
+  - Headers: Authorization: Bearer <token>
+  - Response: 200 { user }
+
+Requests Routes (/requests)
+- All endpoints below require Authorization header with valid JWT.
+
+- GET /requests
+  - Description: Get requests; optional query param `userId` to filter by user.
+  - Query: ?userId=<id>
+  - Response: 200 [ { id, userId, title, description, type, priority, status, handler, createdAt, updatedAt, logs } ]
+
+- GET /requests/:id
+  - Description: Get a single request by ID
+  - Response: 200 { request }
+
+- POST /requests
+  - Description: Create a new request
+  - Body (JSON): { title, description, type?, priority?, authorId? }
+  - Response: 201 { request }
+  - Notes: Creates a global staff notification on new request.
+
+- PUT /requests/:id/status
+  - Description: Update request status
+  - Body (JSON): { status, actor? }
+  - Response: 200 { request }
+  - Notes: Adds a log entry and notifies the request owner.
+
+- PUT /requests/:id/assign
+  - Description: Assign a handler to a request
+  - Body (JSON): { staffId }
+  - Response: 200 { request }
+
+- POST /requests/:id/logs
+  - Description: Add a log entry to a request
+  - Body (JSON): { actor?, message }
+  - Response: 200 { request }
+
+Notifications Routes (/notifications)
+- All endpoints require Authorization header with valid JWT.
+
+- GET /notifications
+  - Description: Get notifications for current user or for a provided `userId` (staff global notifications have userId=null)
+  - Query: ?userId=<id> (optional)
+  - Response: 200 [ { id, userId, message, read, ts } ]
+
+- PUT /notifications/:id/read
+  - Description: Mark a notification as read
+  - Response: 200 { notification }
+
+Frontend (client) usage
+-----------------------
+- `src/lib/api.js` - API helper used by frontend.
+  - Exports: `API_BASE` (from `process.env.REACT_APP_API_URL`) and `apiFetch(path, options)`.
+  - `apiFetch` expects `API_BASE` to be set (non-empty). It builds URL: `${API_BASE}/${path}` and does fetch with `credentials: 'include'`.
+  - If `REACT_APP_API_URL` is `''` the code throws 'API base URL not configured'.
+
+- `src/lib/auth.js` - frontend auth wrapper that calls:
+  - POST `${API_BASE}/auth/login`
+  - POST `${API_BASE}/auth/register`
+  - POST `${API_BASE}/auth/logout`
+  - GET `${API_BASE}/auth/me`
+  - On success stores `{ user, token }` in localStorage under `br_current_user_v1`.
+
+- `src/lib/requests.js` - frontend requests wrapper that calls:
+  - GET `${API_BASE}/requests?userId=...`
+  - GET `${API_BASE}/requests` (all requests)
+  - GET `${API_BASE}/requests/:id`
+  - POST `${API_BASE}/requests`
+  - PUT `${API_BASE}/requests/:id/status`
+  - PUT `${API_BASE}/requests/:id/assign`
+  - POST `${API_BASE}/requests/:id/logs`
+  - GET `${API_BASE}/notifications?userId=...`
+  - PUT `${API_BASE}/notifications/:id/read`
+
+CORS and credentials
+--------------------
+- The frontend uses `fetch(..., { credentials: 'include' })`. When using credentials, the backend must:
+  - Return `Access-Control-Allow-Credentials: true` and
+  - Return `Access-Control-Allow-Origin` set to the exact origin of the frontend (e.g., `http://localhost:3000`) — not `*`.
+- `backend/server.js` was updated to use `cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000', credentials: true })` and to respond to preflight `OPTIONS`.
+
+Common troubleshooting
+----------------------
+- "API not configured" when registering: frontend `REACT_APP_API_URL` is missing or empty. Create root `.env` with `REACT_APP_API_URL=http://localhost:5000` and restart the dev server.
+- `ECONNREFUSED _mongodb._tcp...` on server start: DNS SRV lookup to Atlas failed. Use a local MongoDB or use the non-SRV standard connection string from Atlas.
+- CORS preflight errors: ensure backend `CORS_ORIGIN` matches frontend origin and `credentials: true` is set.
+- UI errors like `requests.filter is not a function` or `notifications.filter is not a function`: caused by storing Promises in React state. The frontend code was patched to `await` the API calls (use `.then` and set arrays) so state is always an array.
+
+Files modified during debugging (notes)
+-------------------------------------
+- `backend/server.js` - added corsOptions and preflight handling
+- `backend/.env` - updated/cleaned MONGODB_URI (ensure no duplicate key)
+- `src/lib/api.js` - informs if `REACT_APP_API_URL` missing
+- `src/components/ui/Navbar.jsx` - initialize notifications as array and fetch promise
+- `src/frontend/ResidentDashboard.jsx` - ensure requests are set after resolving promises
+- `src/frontend/StaffDashboard.jsx` - ensure getAllRequests() resolved before set
+
+------------
+
+
+-- End of documentation --

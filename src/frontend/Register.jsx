@@ -86,10 +86,11 @@ function Register() {
       
       // call mock register which will auto-login the user on success
       register(submissionData)
-        .then(() => {
-          console.log('Registration successful');
-          // redirect by role
-          if (submissionData.role === 'staff') navigate('/staff');
+        .then((safeUser) => { 
+          console.log('Registration successful', safeUser);
+          // prefer the returned user's role (stored server-side), fallback to submission data
+          const role = (safeUser && safeUser.role) || submissionData.role;
+          if (role === 'staff') navigate('/staff');
           else navigate('/residentDashboard');
         })
         .catch((err) => {
@@ -303,7 +304,7 @@ function Register() {
               <p className="text-sm text-gray-600">
                 Already have an account?{" "}
                 <Link
-                  to="/Login"
+                  to="/login"
                   className="text-blue-600 hover:text-blue-500 font-medium"
                 >
                   Sign in
