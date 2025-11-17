@@ -18,13 +18,15 @@ const requestSchema = new mongoose.Schema(
       trim: true
     },
     type: {
+      // Allow free-form request types from the frontend (e.g. "Barangay Clearance").
+      // Older enum restrictions caused validation errors when the UI sent human-readable labels.
       type: String,
-      enum: ['general', 'complaint', 'request', 'feedback'],
       default: 'general'
     },
     priority: {
+      // Keep common priorities but accept 'urgent' coming from the UI as well.
       type: String,
-      enum: ['low', 'medium', 'high'],
+      enum: ['low', 'medium', 'high', 'urgent'],
       default: 'medium'
     },
     status: {
